@@ -15,10 +15,10 @@ dependencies = [
 ]
 
 [project.urls]
-Homepage = "https://github.com/miguelangel_lv/ha-balance-neto/"
-Changelog = "https://github.com/miguelangel_lv/ha-balance-neto/releases"
-Issues = "https://github.com/miguelangel_lv/ha-balance-neto/issues"
-Repository = "https://github.com/miguelangel_lv/ha-balance-neto"
+Homepage = "https://github.com/miguelangellv/ha-balance-neto/"
+Changelog = "https://github.com/miguelangellv/ha-balance-neto/releases"
+Issues = "https://github.com/miguelangellv/ha-balance-neto/issues"
+Repository = "https://github.com/miguelangellv/ha-balance-neto"
 
 
 [tool.hatch.build.targets.wheel]
