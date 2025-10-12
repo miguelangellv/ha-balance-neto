@@ -40,7 +40,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     @callback
     @override
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionFlowHandler:
-        return OptionFlowHandler(config_entry)
+        return OptionFlowHandler()
 
     @override
     def is_matching(self, other_flow: Self) -> bool:
@@ -77,9 +77,9 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
 class OptionFlowHandler(config_entries.OptionsFlow):
     """Reconfigure Flow for Net Balance."""
 
-    def __init__(self, config_entry: ConfigEntry) -> None:
-        """Initialize values."""
-        self.config_entry = config_entry
+    @property
+    def config_entry(self):
+        return self.hass.config_entries.async_get_entry(self.handler)
 
     async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Flow to configure all sensors."""
