@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, Self
 
 from typing_extensions import override
 import voluptuous as vol
@@ -42,22 +42,16 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
     def async_get_options_flow(config_entry: ConfigEntry) -> OptionFlowHandler:
         return OptionFlowHandler(config_entry)
 
-    async def async_step_user(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    @override
+    def is_matching(self, other_flow: Self) -> bool:
+        return False
+
+    async def async_step_user(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Config flow for Net Balance."""
         schema = vol.Schema(
             {
-                vol.Required(GRID_IMPORT): EntitySelector(
-                    EntitySelectorConfig(
-                        multiple=False, device_class=SensorDeviceClass.ENERGY
-                    )
-                ),
-                vol.Required(GRID_EXPORT): EntitySelector(
-                    EntitySelectorConfig(
-                        multiple=False, device_class=SensorDeviceClass.ENERGY
-                    )
-                ),
+                vol.Required(GRID_IMPORT): EntitySelector(EntitySelectorConfig(multiple=False, device_class=SensorDeviceClass.ENERGY)),
+                vol.Required(GRID_EXPORT): EntitySelector(EntitySelectorConfig(multiple=False, device_class=SensorDeviceClass.ENERGY)),
                 vol.Required(PERIOD, default=HOURLY): SelectSelector(
                     SelectSelectorConfig(
                         multiple=False,
@@ -69,9 +63,7 @@ class ConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                         ],
                     )
                 ),
-                vol.Required(OFFSET, default=5): NumberSelector(
-                    NumberSelectorConfig(min=0, max=300, unit_of_measurement="s")
-                ),
+                vol.Required(OFFSET, default=5): NumberSelector(NumberSelectorConfig(min=0, max=300, unit_of_measurement="s")),
             }
         )
 
@@ -89,30 +81,20 @@ class OptionFlowHandler(config_entries.OptionsFlow):
         """Initialize values."""
         self.config_entry = config_entry
 
-    async def async_step_init(
-        self, user_input: dict[str, Any] | None = None
-    ) -> FlowResult:
+    async def async_step_init(self, user_input: dict[str, Any] | None = None) -> FlowResult:
         """Flow to configure all sensors."""
-        grid_import = self.config_entry.options.get(
-            GRID_IMPORT, self.config_entry.data[GRID_IMPORT]
-        )
-        grid_export = self.config_entry.options.get(
-            GRID_EXPORT, self.config_entry.data[GRID_EXPORT]
-        )
+        grid_import = self.config_entry.options.get(GRID_IMPORT, self.config_entry.data[GRID_IMPORT])
+        grid_export = self.config_entry.options.get(GRID_EXPORT, self.config_entry.data[GRID_EXPORT])
         period = self.config_entry.options.get(PERIOD, self.config_entry.data[PERIOD])
         offset = self.config_entry.options.get(OFFSET, self.config_entry.data[OFFSET])
 
         schema = vol.Schema(
             {
                 vol.Required(GRID_IMPORT, default=grid_import): EntitySelector(
-                    EntitySelectorConfig(
-                        multiple=False, device_class=SensorDeviceClass.ENERGY
-                    )
+                    EntitySelectorConfig(multiple=False, device_class=SensorDeviceClass.ENERGY)
                 ),
                 vol.Required(GRID_EXPORT, default=grid_export): EntitySelector(
-                    EntitySelectorConfig(
-                        multiple=False, device_class=SensorDeviceClass.ENERGY
-                    )
+                    EntitySelectorConfig(multiple=False, device_class=SensorDeviceClass.ENERGY)
                 ),
                 vol.Required(PERIOD, default=period): SelectSelector(
                     SelectSelectorConfig(
@@ -125,9 +107,7 @@ class OptionFlowHandler(config_entries.OptionsFlow):
                         ],
                     )
                 ),
-                vol.Required(OFFSET, default=offset): NumberSelector(
-                    NumberSelectorConfig(min=0, max=300, unit_of_measurement="s")
-                ),
+                vol.Required(OFFSET, default=offset): NumberSelector(NumberSelectorConfig(min=0, max=300, unit_of_measurement="s")),
             }
         )
 

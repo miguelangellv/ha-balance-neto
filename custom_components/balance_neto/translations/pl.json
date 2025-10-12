@@ -13,7 +13,7 @@
     }
   },
   "entity": {
-    "sensor":{
+    "sensor": {
       "net_exported": {
         "name": "Energia - Export netto"
       },

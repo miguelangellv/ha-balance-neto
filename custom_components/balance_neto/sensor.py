@@ -73,9 +73,7 @@ _LOGGER = logging.getLogger(__name__)
 
 
 # pylint: disable=too-many-locals
-async def async_setup_entry(
-    hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback
-) -> None:
+async def async_setup_entry(hass: HomeAssistant, entry: ConfigEntry, async_add_entities: AddEntitiesCallback) -> None:
     """Initialise sensors and add to Home Assistant."""
     offset = entry.data[OFFSET]
     period = entry.data[PERIOD]
@@ -85,12 +83,12 @@ async def async_setup_entry(
     grid_export = GridNetSensor(EXPORT_DESCRIPTION, f"{entry.entry_id}-export")
 
     grid_balance = BalanceSensor(
-        BALANCE_DESCRIPTION,
-        grid_import,
-        grid_export,
-        import_id,
-        export_id,
-        f"{entry.entry_id}-balance",
+        description=BALANCE_DESCRIPTION,
+        import_sensor=grid_import,
+        export_sensor=grid_export,
+        import_id=import_id,
+        export_id=export_id,
+        unique_id=f"{entry.entry_id}-balance",
     )
 
     async_add_entities([grid_import, grid_export, grid_balance])
@@ -112,9 +110,7 @@ async def async_setup_entry(
     @callback
     async def update_totals_and_schedule(_now: datetime) -> None:
         await grid_balance.update_totals()
-        async_track_point_in_time(
-            hass, update_totals_and_schedule, _now + timedelta(minutes=minutes)
-        )
+        async_track_point_in_time(hass, update_totals_and_schedule, _now + timedelta(minutes=minutes))
 
     async def first_after_reboot(_now: datetime) -> None:
         await grid_export.after_reboot()
@@ -123,11 +119,7 @@ async def async_setup_entry(
     now = datetime.now(tz=pytz.UTC).replace(second=0, microsecond=0)
 
     next_minutes = minutes - now.minute % minutes
-    next_reset = (
-        now.replace(second=0)
-        + timedelta(minutes=next_minutes)
-        - timedelta(seconds=offset)
-    )
+    next_reset = now.replace(second=0) + timedelta(minutes=next_minutes) - timedelta(seconds=offset)
 
     async_track_point_in_time(hass, update_totals_and_schedule, next_reset)
     hass.bus.async_listen_once(EVENT_HOMEASSISTANT_STARTED, first_after_reboot)
@@ -178,9 +170,10 @@ class GridNetSensor(SensorEntity, RestoreEntity):
 class BalanceSensor(SensorEntity, RestoreEntity):
     """Net Balance Sensor."""
 
-    # pylint: disable=too-many-instance-attributes too-many-arguments
+    # pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments
     def __init__(  # noqa: PLR0913
         self,
+        *,
         description: SensorEntityDescription,
         import_sensor: GridNetSensor,
         export_sensor: GridNetSensor,
@@ -231,9 +224,7 @@ class BalanceSensor(SensorEntity, RestoreEntity):
         }
 
     async def _update_value(self) -> None:
-        self._state = (self._export - self._export_offset) - (
-            self._import - self._import_offset
-        )
+        self._state = (self._export - self._export_offset) - (self._import - self._import_offset)
         _LOGGER.debug("Actual Balance %f", self._state)
         self.async_write_ha_state()
 

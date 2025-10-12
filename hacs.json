@@ -1,6 +1,6 @@
 {
-    "name": "Balance Neto",
-    "render_readme": true,
-    "homeassistant": "2023.1.0",
-    "country":"ES"
+  "name": "Balance Neto",
+  "render_readme": true,
+  "homeassistant": "2025.8.0",
+  "country": "ES"
 }
