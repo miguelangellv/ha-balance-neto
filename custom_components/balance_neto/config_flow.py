@@ -3,9 +3,9 @@
 from __future__ import annotations
 
 import logging
-from typing import TYPE_CHECKING, Any, Self
+from typing import TYPE_CHECKING, Any
 
-from typing_extensions import override
+from typing_extensions import override, Self
 import voluptuous as vol
 
 from homeassistant import config_entries
