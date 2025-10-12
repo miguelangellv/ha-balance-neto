@@ -170,7 +170,7 @@ class GridNetSensor(SensorEntity, RestoreEntity):
 class BalanceSensor(SensorEntity, RestoreEntity):
     """Net Balance Sensor."""
 
-    # pylint: disable=too-many-instance-attributes, too-many-arguments, too-many-positional-arguments
+    # pylint: disable=too-many-instance-attributes, too-many-arguments
     def __init__(  # noqa: PLR0913
         self,
         *,
