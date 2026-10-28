@@ -1,7 +1,9 @@
 {
   "domain": "balance_neto",
   "name": "Balance Neto",
-  "categories": ["energy"],
+  "after_dependencies": [
+    "recorder"
+  ],
   "codeowners": ["@miguelangellv"],
   "config_flow": true,
   "documentation": "https://github.com/MiguelAngelLV/balance_neto",
