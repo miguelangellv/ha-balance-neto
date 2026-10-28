@@ -46,8 +46,8 @@ known-first-party = [
 ]
 combine-as-imports = true
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pre-commit>=3.6.0",
     "pre-commit-hooks>=4.5.0",
     "pylint>=3.1.0",
