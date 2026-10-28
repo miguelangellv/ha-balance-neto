@@ -1,0 +1,216 @@
+name: Create Release and Tag
+
+on:
+  pull_request:
+    types: [closed]
+    branches:
+      - main
+
+jobs:
+  create-release:
+    # Solo ejecutar si la PR fue mergeada y tiene la etiqueta "release"
+    if: github.event.pull_request.merged == true && contains(github.event.pull_request.labels.*.name, 'release')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pull-requests: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: main
+
+      - name: Get version from manifest
+        id: get_version
+        run: |
+          VERSION=$(jq -r '.version' custom_components/balance_neto/manifest.json)
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Version from manifest: $VERSION"
+
+      - name: Get PR body
+        id: pr_body
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          PR_BODY=$(gh pr view $PR_NUMBER --json body --jq '.body')
+          
+          # Guardar el body de la PR en un archivo
+          echo "$PR_BODY" > /tmp/pr_body.txt
+          
+          # Extraer la sección de cambios
+          CHANGELOG=$(echo "$PR_BODY" | sed -n '/### 📋 Cambios incluidos/,/---/p' | sed '1d;$d' | sed '/^$/d')
+          
+          if [ -z "$CHANGELOG" ]; then
+            # Si no hay sección de changelog, usar todo el body
+            CHANGELOG="$PR_BODY"
+          fi
+          
+          echo "$CHANGELOG" > /tmp/changelog.txt
+          echo "Changelog extracted from PR"
+
+      - name: Check if tag exists
+        id: check_tag
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          if git rev-parse "v$VERSION" >/dev/null 2>&1; then
+            echo "exists=true" >> $GITHUB_OUTPUT
+            echo "⚠️ Tag v$VERSION already exists"
+          else
+            echo "exists=false" >> $GITHUB_OUTPUT
+            echo "✅ Tag v$VERSION does not exist"
+          fi
+
+      - name: Create and push tag
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git tag -a "v$VERSION" -m "Release v$VERSION"
+          git push origin "v$VERSION"
+          
+          echo "✅ Tag v$VERSION created and pushed"
+
+      - name: Create GitHub Release
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          CHANGELOG=$(cat /tmp/changelog.txt)
+          
+          # Crear release notes
+          RELEASE_NOTES=$(cat <<EOF
+          ## 🚀 Balance Neto v$VERSION
+          
+          $CHANGELOG
+          
+          ### 📊 Información de la Release
+          
+          **Fecha**: $(date +%Y-%m-%d)
+          **Commit**: \`${GITHUB_SHA:0:7}\`
+          **PR**: #${{ github.event.pull_request.number }}
+          EOF
+          )
+          
+          # Crear la release
+          gh release create "v$VERSION" \
+            --title "v$VERSION" \
+            --notes "$RELEASE_NOTES" \
+            --target main
+          
+          echo "✅ GitHub Release v$VERSION created successfully"
+
+      - name: Create release archive
+        if: steps.check_tag.outputs.exists == 'false'
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          
+          # Crear directorio temporal
+          mkdir -p /tmp/balance_neto
+          
+          # Copiar archivos de la integración
+          cp -r custom_components/balance_neto/* /tmp/balance_neto/
+          
+          # Crear archivo zip
+          cd /tmp
+          zip -r balance_neto.zip balance_neto/
+          
+          echo "✅ Archive created: balance_neto.zip"
+
+      - name: Upload release archive
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          
+          # Subir el archivo a la release
+          gh release upload "v$VERSION" /tmp/balance_neto.zip
+          
+          echo "✅ Archive uploaded to release v$VERSION"
+
+      - name: Update release description with download info
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          
+          # Obtener las notas actuales
+          CURRENT_NOTES=$(gh release view "v$VERSION" --json body --jq '.body')
+          
+          # Añadir información de descarga
+          DOWNLOAD_INFO=$(cat <<EOF
+          
+          ### 📥 Descargas
+          
+          - **balance_neto.zip** - Integración completa para instalación manual
+          EOF
+          )
+          
+          NEW_NOTES="${CURRENT_NOTES}${DOWNLOAD_INFO}"
+          
+          # Actualizar la release
+          gh release edit "v$VERSION" --notes "$NEW_NOTES"
+          
+          echo "✅ Release description updated"
+
+      - name: Comment on PR
+        if: steps.check_tag.outputs.exists == 'false'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          
+          COMMENT=$(cat <<EOF
+          ## 🎉 Release Creada Exitosamente
+          
+          ✅ La release **v$VERSION** ha sido creada automáticamente.
+          
+          - 🏷️ Tag: [\`v$VERSION\`](https://github.com/${{ github.repository }}/releases/tag/v$VERSION)
+          - 📦 Release: [v$VERSION](https://github.com/${{ github.repository }}/releases/tag/v$VERSION)
+          
+          ### Próximos pasos
+          
+          1. Verifica que la release tenga toda la información correcta
+          2. Si usas HACS, la nueva versión estará disponible automáticamente
+          3. Los usuarios podrán actualizar desde la interfaz de HACS
+          EOF
+          )
+          
+          gh pr comment $PR_NUMBER --body "$COMMENT"
+          
+          echo "✅ Comment added to PR #$PR_NUMBER"
+
+      - name: Notify if tag exists
+        if: steps.check_tag.outputs.exists == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          VERSION="${{ steps.get_version.outputs.version }}"
+          PR_NUMBER="${{ github.event.pull_request.number }}"
+          
+          COMMENT=$(cat <<EOF
+          ## ⚠️ Tag Already Exists
+          
+          El tag \`v$VERSION\` ya existe en el repositorio.
+          
+          Por favor, verifica si:
+          1. La versión en el manifest es correcta
+          2. No hay un conflicto con una release anterior
+          
+          Si necesitas crear una nueva release, asegúrate de que la versión sea única.
+          EOF
+          )
+          
+          gh pr comment $PR_NUMBER --body "$COMMENT"
+          
+          echo "⚠️ Tag v$VERSION already exists - skipping release creation"
+          exit 1
+

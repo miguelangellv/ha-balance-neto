@@ -10,7 +10,6 @@ import pytz
 from typing_extensions import override
 
 from homeassistant.components.sensor import (
-    RestoreEntity,
     SensorDeviceClass,
     SensorEntity,
     SensorEntityDescription,
@@ -23,6 +22,8 @@ from homeassistant.helpers.event import (
     async_track_point_in_time,
     async_track_state_change_event,
 )
+
+from homeassistant.helpers.restore_state import RestoreEntity
 
 from .const import GRID_EXPORT, GRID_IMPORT, HOURLY, MAX_DIFF, OFFSET, PERIOD
 

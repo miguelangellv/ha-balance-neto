@@ -9,9 +9,9 @@ license = "MIT"
 readme = "README.md"
 repository = "https://github.com/miguelangellv/ha-balance-neto"
 
-requires-python = ">=3.13.2"
+requires-python = ">=3.14.2"
 dependencies = [
-    "homeassistant>=2025.8.0",
+    "homeassistant>=2026.10.0",
 ]
 
 [project.urls]
@@ -46,8 +46,8 @@ known-first-party = [
 ]
 combine-as-imports = true
 
-[tool.uv]
-dev-dependencies = [
+[dependency-groups]
+dev = [
     "pre-commit>=3.6.0",
     "pre-commit-hooks>=4.5.0",
     "pylint>=3.1.0",
