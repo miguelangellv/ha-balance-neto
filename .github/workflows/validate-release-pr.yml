@@ -1,0 +1,180 @@
+name: Validate Release PR
+
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, labeled]
+    branches:
+      - main
+
+jobs:
+  validate:
+    # Solo ejecutar si la PR tiene la etiqueta "release"
+    if: contains(github.event.pull_request.labels.*.name, 'release')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Validate PR title format
+        run: |
+          PR_TITLE="${{ github.event.pull_request.title }}"
+          
+          # Verificar que el título comience con 'v' seguido de un número de versión
+          if [[ ! "$PR_TITLE" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "❌ El título de la PR debe ser un número de versión (ej: v2.3.1)"
+            echo "Título actual: $PR_TITLE"
+            exit 1
+          fi
+          
+          echo "✅ Título de la PR válido: $PR_TITLE"
+
+      - name: Get versions from files
+        id: versions
+        run: |
+          MANIFEST_VERSION=$(jq -r '.version' custom_components/balance_neto/manifest.json)
+          PYPROJECT_VERSION=$(grep '^version = ' pyproject.toml | cut -d'"' -f2)
+          PR_VERSION="${{ github.event.pull_request.title }}"
+          PR_VERSION="${PR_VERSION#v}"  # Eliminar 'v' del inicio
+          
+          echo "manifest=$MANIFEST_VERSION" >> $GITHUB_OUTPUT
+          echo "pyproject=$PYPROJECT_VERSION" >> $GITHUB_OUTPUT
+          echo "pr=$PR_VERSION" >> $GITHUB_OUTPUT
+          
+          echo "Manifest version: $MANIFEST_VERSION"
+          echo "Pyproject version: $PYPROJECT_VERSION"
+          echo "PR version: $PR_VERSION"
+
+      - name: Validate version consistency
+        run: |
+          MANIFEST_VERSION="${{ steps.versions.outputs.manifest }}"
+          PYPROJECT_VERSION="${{ steps.versions.outputs.pyproject }}"
+          PR_VERSION="${{ steps.versions.outputs.pr }}"
+          
+          ERRORS=0
+          
+          # Verificar que manifest.json y pyproject.toml tengan la misma versión
+          if [ "$MANIFEST_VERSION" != "$PYPROJECT_VERSION" ]; then
+            echo "❌ Las versiones en manifest.json ($MANIFEST_VERSION) y pyproject.toml ($PYPROJECT_VERSION) no coinciden"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "✅ Versiones en manifest.json y pyproject.toml coinciden: $MANIFEST_VERSION"
+          fi
+          
+          # Verificar que la versión coincida con el título de la PR
+          if [ "$MANIFEST_VERSION" != "$PR_VERSION" ]; then
+            echo "❌ La versión en los archivos ($MANIFEST_VERSION) no coincide con el título de la PR ($PR_VERSION)"
+            ERRORS=$((ERRORS + 1))
+          else
+            echo "✅ Versión en archivos coincide con el título de la PR: $PR_VERSION"
+          fi
+          
+          if [ $ERRORS -gt 0 ]; then
+            echo ""
+            echo "❌ Se encontraron $ERRORS error(es) en la validación de versiones"
+            exit 1
+          fi
+          
+          echo ""
+          echo "✅ Todas las validaciones de versión pasaron correctamente"
+
+      - name: Check for version increment
+        run: |
+          PR_VERSION="${{ steps.versions.outputs.pr }}"
+          
+          # Obtener el último tag
+          LAST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+          LAST_VERSION="${LAST_TAG#v}"
+          
+          echo "Última versión: $LAST_VERSION"
+          echo "Nueva versión: $PR_VERSION"
+          
+          # Función para comparar versiones
+          version_gt() {
+              test "$(printf '%s\n' "$@" | sort -V | head -n 1)" != "$1"
+          }
+          
+          if version_gt "$PR_VERSION" "$LAST_VERSION"; then
+            echo "✅ La nueva versión ($PR_VERSION) es mayor que la última ($LAST_VERSION)"
+          else
+            echo "❌ La nueva versión ($PR_VERSION) debe ser mayor que la última ($LAST_VERSION)"
+            exit 1
+          fi
+
+      - name: Validate changed files
+        run: |
+          # Obtener archivos modificados en la PR
+          CHANGED_FILES=$(git diff --name-only origin/main...HEAD)
+          
+          echo "Archivos modificados:"
+          echo "$CHANGED_FILES"
+          
+          # Verificar que al menos manifest.json fue modificado
+          if ! echo "$CHANGED_FILES" | grep -q "custom_components/balance_neto/manifest.json"; then
+            echo "❌ manifest.json debe ser modificado en una PR de release"
+            exit 1
+          fi
+          
+          # Verificar que pyproject.toml fue modificado
+          if ! echo "$CHANGED_FILES" | grep -q "pyproject.toml"; then
+            echo "❌ pyproject.toml debe ser modificado en una PR de release"
+            exit 1
+          fi
+          
+          echo "✅ Los archivos requeridos fueron modificados"
+
+      - name: Comment validation results
+        if: success()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const version = '${{ steps.versions.outputs.pr }}';
+            const comment = `## ✅ Validación de Release Exitosa
+            
+            La PR de release para la versión **v${version}** ha pasado todas las validaciones:
+            
+            - ✅ Formato del título correcto
+            - ✅ Versiones consistentes en todos los archivos
+            - ✅ Versión incrementada correctamente
+            - ✅ Archivos requeridos modificados
+            
+            **Versión**: v${version}
+            **Manifest**: ${version}
+            **Pyproject**: ${version}
+            
+            La PR está lista para ser revisada y mergeada.`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
+      - name: Comment validation errors
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const comment = `## ❌ Validación de Release Fallida
+            
+            La PR de release no pasó todas las validaciones. Por favor, revisa los errores en los logs del workflow.
+            
+            ### Pasos para corregir:
+            
+            1. Verifica que el título de la PR sea un número de versión válido (ej: v2.3.1)
+            2. Asegúrate de que las versiones en \`manifest.json\` y \`pyproject.toml\` coincidan
+            3. Verifica que la versión en los archivos coincida con el título de la PR
+            4. Confirma que la nueva versión sea mayor que la última versión publicada
+            
+            Revisa los logs del workflow para más detalles.`;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });
+
