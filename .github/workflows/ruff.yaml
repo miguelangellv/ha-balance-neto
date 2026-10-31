@@ -5,9 +5,6 @@ on:
   pull_request:
   workflow_dispatch:
 
-env:
-  DEFAULT_PYTHON: "3.14"
-
 jobs:
   ruff:
     name: Ruff
@@ -15,6 +12,11 @@ jobs:
     steps:
       - name: ⤵️ Check out code from GitHub
         uses: actions/checkout@v4.2.2
+
+      - name: 🔧 Load project variables
+        uses: cardinalby/export-env-action@v2
+        with:
+          envFile: .github/project.env
 
       - name: 🏗 Set up uv
         uses: astral-sh/setup-uv@v5.3.1
