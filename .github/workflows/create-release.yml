@@ -23,7 +23,9 @@ jobs:
           ref: main
 
       - name: Load project variables
-        run: sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' .github/project.env >> "$GITHUB_ENV"
+        uses: cardinalby/export-env-action@v2
+        with:
+          envFile: .github/project.env
 
       - name: Get version from manifest
         id: get_version
