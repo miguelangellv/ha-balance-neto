@@ -1,6 +1,6 @@
 [project]
 name = "balance_neto"
-version = "2025.10"
+version = "26.10.0"
 description = "Componente para Home Assistant para calcular el Balance Neto Horario en sistemas de autoconsumo"
 authors = [
     { name = "Miguel Ángel López", email = "miguel.angel.lopez.vicente@gmail.com" }
