@@ -22,10 +22,13 @@ jobs:
           fetch-depth: 0
           ref: main
 
+      - name: Load project variables
+        run: sed -e '/^[[:space:]]*#/d' -e '/^[[:space:]]*$/d' .github/project.env >> "$GITHUB_ENV"
+
       - name: Get version from manifest
         id: get_version
         run: |
-          VERSION=$(jq -r '.version' custom_components/balance_neto/manifest.json)
+          VERSION=$(jq -r '.version' "$MANIFEST_PATH")
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Version from manifest: $VERSION"
 
@@ -85,7 +88,7 @@ jobs:
           
           # Crear release notes
           RELEASE_NOTES=$(cat <<EOF
-          ## 🚀 Balance Neto v$VERSION
+          ## 🚀 ${PROJECT_NAME} v$VERSION
           
           $CHANGELOG
           
@@ -101,7 +104,7 @@ jobs:
           gh release create "v$VERSION" \
             --title "v$VERSION" \
             --notes "$RELEASE_NOTES" \
-            --target main
+            --target "$MAIN_BRANCH"
           
           echo "✅ GitHub Release v$VERSION created successfully"
 
@@ -111,16 +114,16 @@ jobs:
           VERSION="${{ steps.get_version.outputs.version }}"
           
           # Crear directorio temporal
-          mkdir -p /tmp/balance_neto
+          mkdir -p "/tmp/${INTEGRATION_DOMAIN}"
           
           # Copiar archivos de la integración
-          cp -r custom_components/balance_neto/* /tmp/balance_neto/
+          cp -r "$INTEGRATION_DIR"/* "/tmp/${INTEGRATION_DOMAIN}/"
           
           # Crear archivo zip
           cd /tmp
-          zip -r balance_neto.zip balance_neto/
+          zip -r "${INTEGRATION_DOMAIN}.zip" "${INTEGRATION_DOMAIN}/"
           
-          echo "✅ Archive created: balance_neto.zip"
+          echo "✅ Archive created: ${INTEGRATION_DOMAIN}.zip"
 
       - name: Upload release archive
         if: steps.check_tag.outputs.exists == 'false'
@@ -130,7 +133,7 @@ jobs:
           VERSION="${{ steps.get_version.outputs.version }}"
           
           # Subir el archivo a la release
-          gh release upload "v$VERSION" /tmp/balance_neto.zip
+          gh release upload "v$VERSION" "/tmp/${INTEGRATION_DOMAIN}.zip"
           
           echo "✅ Archive uploaded to release v$VERSION"
 
@@ -149,7 +152,7 @@ jobs:
           
           ### 📥 Descargas
           
-          - **balance_neto.zip** - Integración completa para instalación manual
+          - **${INTEGRATION_DOMAIN}.zip** - Integración completa para instalación manual
           EOF
           )
           
