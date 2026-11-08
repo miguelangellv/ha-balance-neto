@@ -231,19 +231,25 @@ class BalanceSensor(SensorEntity, RestoreEntity):
 
     async def update_values(self) -> None:
         """Update Net Balance state."""
-        _LOGGER.debug(
-            "Import (%s): %s",
-            self._import_id,
-            self.hass.states.get(self._import_id).state,
-        )
-        _LOGGER.debug(
-            "Export (%s): %s",
-            self._export_id,
-            self.hass.states.get(self._export_id).state,
-        )
+        import_entity = self.hass.states.get(self._import_id)
+        export_entity = self.hass.states.get(self._export_id)
 
-        import_state = self._as_number(self.hass.states.get(self._import_id).state)
-        export_state = self._as_number(self.hass.states.get(self._export_id).state)
+        # On startup one source sensor can change before the other one exists
+        if import_entity is None or export_entity is None:
+            _LOGGER.debug(
+                "Source sensors not available yet (%s: %s, %s: %s), skipping update",
+                self._import_id,
+                import_entity is not None,
+                self._export_id,
+                export_entity is not None,
+            )
+            return
+
+        _LOGGER.debug("Import (%s): %s", self._import_id, import_entity.state)
+        _LOGGER.debug("Export (%s): %s", self._export_id, export_entity.state)
+
+        import_state = self._as_number(import_entity.state)
+        export_state = self._as_number(export_entity.state)
 
         if import_state is None or export_state is None:
             return
@@ -296,5 +302,5 @@ class BalanceSensor(SensorEntity, RestoreEntity):
     def _as_number(value: str) -> float | None:
         try:
             return float(value)
-        except ValueError:
+        except (TypeError, ValueError):
             return None
